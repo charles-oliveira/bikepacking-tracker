@@ -1,0 +1,20 @@
+[
+    {
+        "local": "Posto de Gasolina KM 50",
+        "tipo": "Alimentação",
+        "descricao": "Reabastecimento com lanches leves e água.",
+        "horario": "10:00 AM"
+    },
+    {
+        "local": "Praça Central - Cidade A",
+        "tipo": "Descanso",
+        "descricao": "Parada para descanso e hidratação.",
+        "horario": "12:30 PM"
+    },
+    {
+        "local": "Mirante da Serra",
+        "tipo": "Turismo",
+        "descricao": "Ponto de interesse para fotos e descanso.",
+        "horario": "3:00 PM"
+    }
+]
