@@ -1,0 +1,23 @@
+# Arquivos de configuração locais
+firebase_credentials.json
+firebase/firebase_config.py
+
+# Compiled Python files
+__pycache__/
+*.pyc
+
+# Arquivos temporários do editor
+*.log
+*.tmp
+*.swp
+
+# Dependências instaladas via pip
+venv/
+*.egg-info/
+
+# Arquivos específicos de IDEs
+.idea/
+.vscode/
+
+# Arquivos de dados locais (se não forem necessários no versionamento)
+data/
