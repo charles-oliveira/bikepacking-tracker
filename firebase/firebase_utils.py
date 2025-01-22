@@ -21,10 +21,6 @@ def initialize_firebase(cred_dict, database_url):
 def authenticate_user(email: str, password: str):
     try:
         user = auth.get_user_by_email(email)
-        # Note que autenticação de senha normalmente acontece no front-end. 
-        # Aqui, apenas verificamos se o usuário existe. Para uma autenticação mais robusta:
-        # - Integre com Firebase Client SDK no frontend para autenticar com senha.
-        # - Valide o token no back-end (opcional).
         print(f"Usuário {user.email} autenticado com sucesso!")
         return {"uid": user.uid, "email": user.email}
     except auth.UserNotFoundError:
