@@ -2,138 +2,152 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from firebase_admin import db
-from datetime import datetime, timedelta
+from datetime import datetime
+
+# Função para inicializar conexão com o Firebase
+def initialize_firebase():
+    import firebase_admin
+    from firebase_admin import credentials
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(st.secrets["firebase"]["credentials"])
+        firebase_admin.initialize_app(cred, {
+            "databaseURL": "https://bikepacking-tracker-3fa9f-default-rtdb.firebaseio.com"
+        })
 
 # Função para obter dados do Firebase
 def get_data(path):
     try:
         ref = db.reference(path)
-        data = ref.get()  # Recupera os dados
-        # st.write("Dados recuperados do Firebase:", data)  # Para depuração
+        data = ref.get()
         return data
     except Exception as e:
         st.error(f"Erro ao recuperar dados do Firebase: {e}")
         return None
 
 # Função para processar os dados em um DataFrame
-def prepare_trip_data(data):
+def process_trip_data(data):
+    if not data:
+        return pd.DataFrame()
+
     records = []
-    total_hours = 0  # Total de horas percorridas
-    total_distancia = 0  # Distância total acumulada
-    total_altimetria = 0  # Altimetria total acumulada
-    hour_counter = []  # Lista para registrar as horas e os respectivos valores
-    distance_accumulated = 0  # Distância acumulada
-    altimetria_accumulated = 0  # Altimetria acumulada
-    
+    total_distancia = 0
+    total_altimetria = 0
+    total_minutes = 0
+
     for key, values in data.items():
-        if isinstance(values, dict):  # Verificar se os valores são dicionários
-            timestamp = values.get("timestamp")
-            if timestamp:
-                try:
-                    # Converte o timestamp para uma data legível
-                    date = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y")
-                except ValueError:
-                    # Se o formato do timestamp for errado, use "Sem Data"
-                    date = "Sem Data"
-            else:
-                # Se o timestamp não estiver presente, use "Sem Data"
-                date = "Sem Data"
-            
-            # Converte o tempo para horas
+        if isinstance(values, dict):
+            timestamp = values.get("timestamp", "Sem Data")
             tempo = values.get("tempo", "0:00")
+            distancia = values.get("distancia", 0)
+            altimetria = values.get("altimetria", 0)
+
+            try:
+                # Converte o timestamp para uma data legível
+                date = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y")
+            except ValueError:
+                date = "Sem Data"
+
+            # Converte o tempo para minutos
             try:
                 h, m = map(int, tempo.split(":"))
-                hours = h + m / 60
+                minutes = h * 60 + m
             except ValueError:
-                hours = 0  # Caso o tempo não seja no formato esperado
-            
-            # Adiciona as horas ao total
-            total_hours += hours
-            total_distancia += values.get("distancia", 0)
-            total_altimetria += values.get("altimetria", 0)
-            
-            # Atualiza a lista de horas acumuladas e os valores de distância e altimetria
-            for hour in range(int(hours)):
-                hour_counter.append({
-                    "Hora": f"{int(total_hours)}h",
-                    "Distância (km)": total_distancia,
-                    "Altimetria (m)": total_altimetria
-                })
+                minutes = 0
 
-    return pd.DataFrame(hour_counter)
+            # Atualiza totais
+            total_distancia += distancia
+            total_altimetria += altimetria
+            total_minutes += minutes
 
-# Título da página
-st.title("Relatório de Viagem 🚴")
+            # Converte minutos acumulados para o formato HH:MM
+            total_hours = total_minutes // 60
+            total_remaining_minutes = total_minutes % 60
+            formatted_time = f"{total_hours:02}:{total_remaining_minutes:02}"
 
-# Recuperar os dados do Firebase
-percurso_data = get_data("percurso/custom")  # Caminho correto agora
-if percurso_data:
-    # Processar os dados
-    trip_data = prepare_trip_data(percurso_data)
+            # Adiciona registro
+            records.append({
+                "Hora": formatted_time,
+                "Distância (km)": total_distancia,
+                "Altimetria (m)": total_altimetria,
+                "Data": date
+            })
 
-    # Exibir dados brutos e formatados
-    if not trip_data.empty:
-        # Painel Resumo
-        st.markdown("## Resumo da Viagem")
-        total_distancia = trip_data["Distância (km)"].sum()
-        total_altimetria = trip_data["Altimetria (m)"].sum()
-        total_horas = len(trip_data)
+    return pd.DataFrame(records)
+
+# Função para exibir gráficos
+def plot_trip_progress(df):
+    if df.empty:
+        st.warning("Nenhum dado disponível para exibir os gráficos.")
+        return
+
+    # Gráfico de progresso por hora
+    st.markdown("### Progresso por Hora")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df["Hora"],
+        y=df["Altimetria (m)"],
+        fill='tozeroy',
+        name='Altimetria (m)',
+        line=dict(color='orange', width=2),
+        mode='lines+markers',
+        marker=dict(size=8)
+    ))
+    fig.add_trace(go.Scatter(
+        x=df["Hora"],
+        y=df["Distância (km)"],
+        name='Distância (km)',
+        line=dict(color='blue', width=3),
+        mode='lines+markers',
+        marker=dict(size=8)
+    ))
+    fig.update_layout(
+        title="Progresso por Hora 🚴",
+        xaxis_title="Hora (HH:MM)",
+        yaxis_title="Valores",
+        legend_title="Métricas",
+        hovermode="x unified",
+        template="plotly_white"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Gráfico de comparação de distância e altimetria
+    st.markdown("### Comparação de Altimetria e Distância")
+    fig_bar = go.Figure(data=[
+        go.Bar(name='Distância (km)', x=df["Hora"], y=df["Distância (km)"], marker_color='blue'),
+        go.Bar(name='Altimetria (m)', x=df["Hora"], y=df["Altimetria (m)"], marker_color='orange')
+    ])
+    fig_bar.update_layout(
+        barmode='group',
+        title="Comparação de Altimetria e Distância",
+        xaxis_title="Hora (HH:MM)",
+        yaxis_title="Valores",
+        template="plotly_white"
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+# Inicialização do Firebase e recuperação de dados
+st.title("Progresso da Viagem 🚴")
+
+initialize_firebase()
+trip_data = get_data("percurso/custom")
+
+# Processar e exibir os dados
+if trip_data:
+    trip_df = process_trip_data(trip_data)
+
+    # Exibir resumo
+    st.markdown("## Resumo da Viagem")
+    if not trip_df.empty:
+        total_distancia = trip_df["Distância (km)"].iloc[-1]
+        total_altimetria = trip_df["Altimetria (m)"].iloc[-1]
+        total_horas = len(trip_df)
         st.metric("Distância Total (km)", f"{total_distancia:.2f}")
         st.metric("Altimetria Total (m)", f"{total_altimetria}")
         st.metric("Total de Horas", total_horas)
 
-        # Gráfico de área - Progresso por hora
-        st.markdown("### Progresso por Hora")
-        fig = go.Figure()
-
-        # Adicionar área de Altimetria
-        fig.add_trace(go.Scatter(
-            x=trip_data["Hora"],
-            y=trip_data["Altimetria (m)"],
-            fill='tozeroy',
-            name='Altimetria (m)',
-            line=dict(color='orange', width=2),
-            mode='lines+markers',
-            marker=dict(size=8)
-        ))
-
-        # Adicionar linha de Distância
-        fig.add_trace(go.Scatter(
-            x=trip_data["Hora"],
-            y=trip_data["Distância (km)"],
-            name='Distância (km)',
-            line=dict(color='blue', width=3),
-            mode='lines+markers',
-            marker=dict(size=8)
-        ))
-
-        fig.update_layout(
-            title="Progresso por Hora 🚴",
-            xaxis_title="Hora",
-            yaxis_title="Valores",
-            legend_title="Métricas",
-            hovermode="x unified",
-            template="plotly_white"
-        )
-
-        # Renderizar o gráfico
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Gráfico de barras - Comparação de Altimetria e Distância
-        st.markdown("### Comparação de Altimetria e Distância")
-        fig_bar = go.Figure(data=[
-            go.Bar(name='Distância (km)', x=trip_data["Hora"], y=trip_data["Distância (km)"], marker_color='blue'),
-            go.Bar(name='Altimetria (m)', x=trip_data["Hora"], y=trip_data["Altimetria (m)"], marker_color='orange')
-        ])
-        fig_bar.update_layout(
-            barmode='group',
-            title="Comparação de Altimetria e Distância",
-            xaxis_title="Hora",
-            yaxis_title="Valores",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        # Exibir gráficos
+        plot_trip_progress(trip_df)
     else:
-        st.warning("Nenhum dado processado para exibir.")
+        st.warning("Os dados recuperados não possuem informações processáveis.")
 else:
-    st.warning("Nenhum dado recuperado do Firebase. Verifique a conexão.")
+    st.warning("Nenhum dado encontrado no Firebase. Verifique sua conexão.")
