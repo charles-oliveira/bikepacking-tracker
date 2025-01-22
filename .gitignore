@@ -21,3 +21,4 @@ venv/
 
 # Arquivos de dados locais (se não forem necessários no versionamento)
 data/
+.streamlit/secrets.toml
