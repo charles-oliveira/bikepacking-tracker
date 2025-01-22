@@ -2,17 +2,14 @@ import streamlit as st
 from firebase.firebase_utils import initialize_firebase, set_data, get_data
 
 # Obtém as credenciais da variável de ambiente
-cred_json_str = st.secrets["firebase"]["credentials"]
+cred_dict = st.secrets["firebase"]["credentials"]
 
-if cred_json_str is None:
+if cred_dict is None:
     st.error("As credenciais do Firebase não foram encontradas. Verifique a configuração.")
 else:
-    # Converte a string JSON para dicionário
-    cred_dict = json.loads(cred_json_str)
-    
     # URL do banco de dados
     DATABASE_URL = "https://bikepacking-tracker-default-rtdb.firebaseio.com"
-    
+
     # Inicializar Firebase
     initialize_firebase(cred_dict, DATABASE_URL)
 
