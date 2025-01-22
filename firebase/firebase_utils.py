@@ -5,7 +5,7 @@ from datetime import datetime
 # Inicializar Firebase (uma única vez)
 def initialize_firebase(cred_dict: dict, database_url: str):
     if not firebase_admin._apps:  # Evitar inicialização múltipla
-        cred = credentials.Certificate(cred_dict)  # Usando o dicionário direto
+        cred = credentials.Certificate.from_service_account_info(cred_dict)  # Usando o dicionário diretamente
         firebase_admin.initialize_app(cred, {"databaseURL": database_url})
     print("Firebase inicializado com sucesso!")
 
