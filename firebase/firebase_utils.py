@@ -1,13 +1,15 @@
 import firebase_admin
 from firebase_admin import credentials, db
 from datetime import datetime
+import json
 
 # Inicializar Firebase (uma única vez)
-def initialize_firebase(cred_path: str, database_url: str):
+def initialize_firebase(cred_dict: dict, database_url: str):
     if not firebase_admin._apps:  # Evitar inicialização múltipla
-        cred = credentials.Certificate(cred_path)
+        cred = credentials.Certificate(cred_dict)  # Usando dicionário de credenciais
         firebase_admin.initialize_app(cred, {"databaseURL": database_url})
     print("Firebase inicializado com sucesso!")
+
 
 # Enviar dados para o Firebase (adicionando com 'push' e timestamp)
 def set_data(reference_path: str, data: dict):
