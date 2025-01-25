@@ -30,19 +30,13 @@ def authenticate_user(email: str, password: str):
         print(f"Erro ao autenticar usuário: {e}")
         return None
 
-# Função para enviar dados para o Firebase (adicionando com 'push' e timestamp)
+# Função para enviar dados para o Firebase
 def set_data(reference_path: str, data: dict):
     ref = db.reference(reference_path)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Adiciona um timestamp
-    data_with_timestamp = {**data, "timestamp": timestamp}  # Adiciona o timestamp aos dados
-    ref.push(data_with_timestamp)  # Usando 'push' para adicionar sem sobrescrever
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data_with_timestamp = {**data, "timestamp": timestamp}
+    ref.push(data_with_timestamp)
     print(f"Dados enviados para {reference_path}")
-
-# Função para atualizar dados no Firebase
-def update_data(reference_path: str, data: dict):
-    ref = db.reference(reference_path)
-    ref.update(data)
-    print(f"Dados atualizados em {reference_path}")
 
 # Função para obter dados do Firebase
 def get_data(reference_path: str):
