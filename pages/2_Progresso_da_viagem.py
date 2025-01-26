@@ -129,7 +129,7 @@ def plot_trip_progress(df):
 st.title("Progresso da Viagem 🚴")
 
 initialize_firebase()
-trip_data = get_data("percurso/custom")
+trip_data = get_data("progresso_viagem")
 
 # Processar e exibir os dados
 if trip_data:
