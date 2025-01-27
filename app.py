@@ -1,3 +1,4 @@
+from datetime import datetime
 import streamlit as st
 import pandas as pd
 import folium
@@ -124,6 +125,33 @@ def get_route_data():
         return locations
     return []
 
+def add_location():
+    """
+    Exibe um formulário para adicionar uma nova localização e envia para o Firebase.
+    """
+    st.header("Adicionar Localização")
+
+    with st.form("form_adicionar_localizacao"):
+        cidade = st.text_input("Cidade")
+        latitude = st.number_input("Latitude", min_value=-90.0, max_value=90.0, format="%.6f")
+        longitude = st.number_input("Longitude", min_value=-180.0, max_value=180.0, format="%.6f")
+        submit_button = st.form_submit_button("Adicionar Localização")
+
+        if submit_button:
+            if cidade and latitude and longitude:
+                location_data = {
+                    "cidade": cidade,
+                    "latitude": latitude,
+                    "longitude": longitude
+                }
+                try:
+                    set_data(f"locations/{cidade}", location_data)  # Salvando no Firebase com a chave baseada na cidade
+                    st.success(f"Localização {cidade} adicionada com sucesso!")
+                except Exception as e:
+                    st.error(f"Erro ao adicionar a localização: {e}")
+            else:
+                st.error("Por favor, preencha todos os campos.")
+
 def show_route_map():
     """
     Exibe o mapa do percurso, utilizando os dados de localização obtidos do Firebase.
@@ -162,26 +190,68 @@ def show_route_map():
     except Exception as e:
         st.error(f"Erro ao recuperar os dados: {e}")
 
-cred_dict = load_firebase_credentials()
-if cred_dict:
-    initialize_firebase_connection(cred_dict)
 
+def show_expenses():
+    """
+    Exibe o formulário para registrar os gastos, incluindo descrição e valor.
+    Envia os dados para o Firebase após o envio do formulário.
+    """
+    st.header("Registrar Gastos")
+
+    # Formulário para adicionar um novo gasto
+    with st.form("form_gastos"):
+        descricao = st.text_input("Descrição do Gasto")
+        categoria = st.selectbox("Categoria", ["Alimentação", "Hospedagem", "Transporte", "Outros"])
+        valor = st.number_input("Valor (R$)", min_value=0.0, step=0.1, format="%.2f")
+        data = st.date_input("Data do Gasto", value=datetime.today())  # Seleção manual da data
+        submit_button = st.form_submit_button("Adicionar Gasto")
+
+        if submit_button:
+            if not descricao or valor <= 0:
+                st.error("Por favor, preencha a descrição e o valor do gasto.")
+            else:
+                gasto_data = {
+                    "descricao": descricao,
+                    "categoria": categoria,
+                    "valor": valor,
+                    "data": data.strftime("%Y-%m-%d")  # Formata a data escolhida
+                }
+                try:
+                    set_data("gastos", gasto_data)  # Envia os dados para o Firebase
+                    st.success("Gasto registrado com sucesso!")
+                except Exception as e:
+                    st.error(f"Erro ao registrar o gasto: {e}")
+
+# Função principal
+def main():
+    """
+    Função principal que gerencia a navegação do aplicativo Streamlit.
+    """
     if "authenticated" not in st.session_state:
-        st.session_state.authenticated = cookies.get("authenticated", "false") == "true"
-
-    if not st.session_state.authenticated:
-        display_login()
+        # Se não houver estado de autenticação, verifica se o cookie está presente
+        if cookies.get("authenticated") == "true":
+            st.session_state.authenticated = True
+            st.session_state.user_email = cookies.get("user_email")
     else:
-        st.title("Bikepacking Tracker")
-        
-        if st.sidebar.button("Logout"):
-            logout()
+        # Se já estiver autenticado, não precisa fazer mais nada
+        pass
 
-        page = st.sidebar.radio("Selecione a página", ["Progresso da Viagem", "Mapa do Percurso"])
+    if st.session_state.authenticated:
+        st.sidebar.title(f"Bem-vindo, {st.session_state.user_email}")
+        menu = st.sidebar.selectbox("Menu", ["Progresso da Viagem", "Adicionar Localização e Mapa", "Registrar Gastos"])
+        st.sidebar.button("Logout", on_click=logout)
 
-        if page == "Progresso da Viagem":
+        if menu == "Progresso da Viagem":
             show_trip_progress()
-
-        elif page == "Mapa do Percurso":
+        elif menu == "Adicionar Localização e Mapa":
+            add_location()
             show_route_map()
+        elif menu == "Registrar Gastos":
+            show_expenses()
 
+    else:
+        display_login()
+
+
+if __name__ == "__main__":
+    main()
