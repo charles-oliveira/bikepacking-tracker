@@ -4,3 +4,4 @@ plotly
 firebase-admin
 streamlit-folium
 geocoder
+streamlit-cookies-manager
