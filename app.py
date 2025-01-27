@@ -5,9 +5,20 @@ from streamlit_folium import folium_static
 from firebase.firebase_utils import initialize_firebase, set_data, get_data, authenticate_user
 import json
 import geocoder
+from streamlit_cookies_manager import EncryptedCookieManager
 
-# Função para carregar credenciais do Firebase
+# Inicializando o gerenciador de cookies
+cookies = EncryptedCookieManager(prefix="bikepacking_tracker", password="password")
+if not cookies.ready():
+    st.stop()
+
 def load_firebase_credentials():
+    """
+    Carrega as credenciais do Firebase a partir dos segredos do Streamlit.
+
+    Retorna:
+        dict: Um dicionário contendo as credenciais do Firebase.
+    """
     try:
         cred_string = st.secrets["firebase"]["credentials"]
         cred_dict = json.loads(cred_string)
@@ -17,8 +28,16 @@ def load_firebase_credentials():
         st.error(f"Erro ao carregar credenciais: {e}")
         return None
 
-# Função para inicializar o Firebase
 def initialize_firebase_connection(cred_dict):
+    """
+    Inicializa a conexão com o Firebase usando as credenciais fornecidas.
+
+    Parâmetros:
+        cred_dict (dict): Dicionário contendo as credenciais do Firebase.
+
+    Levanta:
+        RuntimeError: Se houver um erro ao inicializar o Firebase.
+    """
     try:
         DATABASE_URL = "https://bikepacking-tracker-3fa9f-default-rtdb.firebaseio.com"
         initialize_firebase(cred_dict, DATABASE_URL)
@@ -26,8 +45,11 @@ def initialize_firebase_connection(cred_dict):
     except Exception as e:
         st.error(f"Erro ao inicializar o Firebase: {e}")
 
-# Função para exibir a tela de login
 def display_login():
+    """
+    Exibe a tela de login para autenticação do usuário.
+    Permite que o usuário insira o email e a senha para acessar a aplicação.
+    """
     st.title("Login para acesso")
     email = st.text_input("Email", placeholder="Digite seu email")
     password = st.text_input("Senha", placeholder="Digite sua senha", type="password")
@@ -37,14 +59,29 @@ def display_login():
             user = authenticate_user(email, password)
             if user:
                 st.session_state.authenticated = True
+                cookies["authenticated"] = "true"
+                cookies["user_email"] = user["email"]
+                cookies.save()
                 st.success(f"Bem-vindo(a), {user['email']}!")
             else:
                 st.error("Credenciais inválidas. Tente novamente.")
         except Exception as e:
             st.error(f"Erro ao autenticar: {e}")
 
-# Função para exibir a página de progresso da viagem
+def logout():
+    """
+    Realiza o logout do usuário, removendo a autenticação e limpando os cookies.
+    """
+    st.session_state.authenticated = False
+    cookies.delete("authenticated")
+    cookies.delete("user_email")
+    st.success("Você saiu com sucesso!")
+
 def show_trip_progress():
+    """
+    Exibe o formulário para registrar o progresso da viagem, incluindo distância, altimetria e tempo estimado.
+    Envia os dados para o Firebase após o envio do formulário.
+    """
     st.header("Progresso da Viagem")
     with st.form("form_progresso"):
         distancia = st.number_input("Distância (km)", min_value=0.0, step=0.1, format="%.2f")
@@ -67,21 +104,37 @@ def show_trip_progress():
                 except Exception as e:
                     st.error(f"Erro ao enviar os dados: {e}")
 
-# Função para exibir o mapa do percurso
+@st.cache_data
+def get_route_data():
+    """
+    Obtém os dados das localizações do Firebase, armazenando-os em cache para evitar chamadas repetidas.
+
+    Retorna:
+        list: Uma lista de dicionários contendo as informações de localização.
+    """
+    data = get_data("locations")
+    if data:
+        locations = []
+        for loc in data.values():
+            cidade = loc.get("cidade", "Desconhecida")
+            latitude = loc.get("latitude")
+            longitude = loc.get("longitude")
+            if latitude and longitude:
+                locations.append({"cidade": cidade, "latitude": latitude, "longitude": longitude})
+        return locations
+    return []
+
 def show_route_map():
-    st.header("Mapa do Percurso 📍")
+    """
+    Exibe o mapa do percurso, utilizando os dados de localização obtidos do Firebase.
+    Utiliza a biblioteca Folium para gerar o mapa e visualizá-lo na aplicação.
+    """
+    st.header("Mapa do Percurso")
 
     try:
-        data = get_data("locations")
-        if data:
-            locations = []
-            for loc in data.values():
-                cidade = loc.get("cidade", "Desconhecida")
-                latitude = loc.get("latitude")
-                longitude = loc.get("longitude")
-                if latitude and longitude:
-                    locations.append({"cidade": cidade, "latitude": latitude, "longitude": longitude})
+        locations = get_route_data()
 
+        if locations:
             map_data = pd.DataFrame(locations)
 
             if not map_data.empty:
@@ -102,89 +155,33 @@ def show_route_map():
             else:
                 st.info("Nenhuma localização válida encontrada para exibir no mapa.")
 
-            st.subheader("Linha do Tempo 🔍")
+            st.subheader("Linha do Tempo")
             for loc in locations:
                 st.write(f"- {loc['cidade']} ({loc['latitude']}, {loc['longitude']})")
 
     except Exception as e:
         st.error(f"Erro ao recuperar os dados: {e}")
 
-    # Captura e envio da localização (latitude, longitude e cidade)
-    capture_and_send_location()
-
-    # Captura de localização atual por IP
-    capture_location_by_ip()
-
-    # Pesquisa de coordenadas pelo nome da cidade
-    capture_location_by_city()
-
-# Função para capturar e enviar uma nova localização
-def capture_and_send_location():
-    with st.form("form_nova_localizacao"):
-        latitude = st.number_input("Latitude", format="%.6f", value=0.0)
-        longitude = st.number_input("Longitude", format="%.6f", value=0.0)
-        cidade = st.text_input("Cidade", value="")
-
-        submit_location = st.form_submit_button("Enviar Localização")
-        if submit_location:
-            if not latitude or not longitude or not cidade:
-                st.error("Por favor, preencha todos os campos.")
-            else:
-                new_location = {
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "cidade": cidade,
-                }
-                try:
-                    set_data("locations", new_location)
-                    st.success("Nova localização enviada para o Firebase!")
-                except Exception as e:
-                    st.error(f"Erro ao enviar os dados: {e}")
-
-# Função para capturar localização atual por IP
-def capture_location_by_ip():
-    if st.button("Capturar Localização Atual (por IP)"):
-        g = geocoder.ip('me')
-        if g.latlng:
-            latitude, longitude = g.latlng
-            st.session_state["latitude"] = latitude
-            st.session_state["longitude"] = longitude
-            st.success(f"Localização capturada: ({latitude}, {longitude})")
-        else:
-            st.error("Não foi possível capturar a localização atual.")
-
-# Função para capturar coordenadas de uma cidade
-def capture_location_by_city():
-    cidade = st.text_input("Digite sua cidade para obter coordenadas:")
-    if cidade:
-        g_city = geocoder.osm(cidade)
-        if g_city.latlng:
-            latitude, longitude = g_city.latlng
-            st.session_state["latitude"] = latitude
-            st.session_state["longitude"] = longitude
-            st.success(f"Localização capturada pela cidade: ({latitude}, {longitude})")
-        else:
-            st.error("Não foi possível capturar a localização dessa cidade.")
-
-# Carregar credenciais e inicializar Firebase
 cred_dict = load_firebase_credentials()
 if cred_dict:
     initialize_firebase_connection(cred_dict)
 
-    # Tela de login ou conteúdo após login
     if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
+        st.session_state.authenticated = cookies.get("authenticated", "false") == "true"
 
     if not st.session_state.authenticated:
         display_login()
     else:
-        st.title("Bikepacking Tracker 📍")
+        st.title("Bikepacking Tracker")
+        
+        if st.sidebar.button("Logout"):
+            logout()
+
         page = st.sidebar.radio("Selecione a página", ["Progresso da Viagem", "Mapa do Percurso"])
 
-        # Página de Progresso da Viagem
         if page == "Progresso da Viagem":
             show_trip_progress()
 
-        # Página de Mapa do Percurso
         elif page == "Mapa do Percurso":
             show_route_map()
+
