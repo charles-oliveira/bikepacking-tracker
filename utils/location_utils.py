@@ -29,7 +29,7 @@ def add_location_to_db(location):
     try:
         set_data("locations", location)
         st.success(f"Localização {location['cidade']} adicionada com sucesso!")
-        st.experimental_rerun()  # Força a atualização da página
+        st.experimental_rerun() 
     except Exception as e:
         st.error(f"Erro ao adicionar localização: {e}")
 
@@ -39,7 +39,6 @@ def display_map_page():
     """
     st.header("Mapa do Percurso")
     
-    # Mostrar localizações já armazenadas
     try:
         locations = get_route_data()
         if locations:
@@ -62,7 +61,6 @@ def display_map_page():
     except Exception as e:
         st.error(f"Erro ao carregar o mapa: {e}")
 
-    # Opções de captura de localização
     st.subheader("Adicionar Nova Localização")
     location_option = st.radio(
         "Escolha como você deseja capturar a localização:",
@@ -70,7 +68,6 @@ def display_map_page():
     )
 
     if location_option == "Manual":
-        # Campos para a localização manual
         cidade = st.text_input("Cidade")
         latitude = st.number_input("Latitude", format="%.6f")
         longitude = st.number_input("Longitude", format="%.6f")
@@ -87,7 +84,6 @@ def display_map_page():
                 st.warning("Por favor, preencha todos os campos.")
 
     elif location_option == "GPS":
-        # Capturar localização via GPS
         gps_location = get_gps_location()
 
         if gps_location:
@@ -99,7 +95,6 @@ def get_gps_location():
     Captura a localização via GPS usando JavaScript.
     """
     location = None
-    # Código JavaScript para obter a localização via GPS
     gps_code = """
     <script>
         if (navigator.geolocation) {
@@ -115,7 +110,6 @@ def get_gps_location():
         }
     </script>
     """
-    # Envia a localização para o Python
     html(gps_code, height=0)
 
     return location
