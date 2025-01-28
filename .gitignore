@@ -1,6 +1,7 @@
 # Arquivos de configuração locais
 firebase_credentials.json
 firebase/firebase_config.py
+firebase/service_account.json
 
 # Compiled Python files
 __pycache__/

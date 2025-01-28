@@ -20,6 +20,7 @@ def initialize_firebase(cred_dict, database_url):
     except Exception as e:
         raise RuntimeError(f"Erro ao inicializar o Firebase: {e}")
 
+
 def authenticate_user(email: str, password: str):
     """
     Autentica um usuário no Firebase com base no email fornecido.
